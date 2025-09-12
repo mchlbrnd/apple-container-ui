@@ -1,99 +1,69 @@
 import { useState } from "react";
-import { Registry } from "@/types/registry";
-import { mockRegistries } from "@/data/mockRegistries";
+import { useRegistry } from "@/hooks/useRegistry";
 import { RegistryToolbar } from "@/components/registry/RegistryToolbar";
-import { RegistryList } from "@/components/registry/RegistryList";
+import { RegistryCard } from "@/components/registry/RegistryCard";
 import { LoginDialog } from "@/components/registry/LoginDialog";
 import { useToast } from "@/hooks/use-toast";
 
 export default function RegistryPage() {
-  const [registries, setRegistries] = useState<Registry[]>(mockRegistries);
-  const [selectedRegistry, setSelectedRegistry] = useState<Registry | null>(null);
+  const { registry, isLoading, error, login, logout, setDefault } = useRegistry();
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const handleRegistryClick = (registry: Registry) => {
-    setSelectedRegistry(registry);
-  };
-
   const handleLogin = () => {
-    if (selectedRegistry) {
-      setLoginDialogOpen(true);
-    }
+    setLoginDialogOpen(true);
   };
 
-  const handleLoginSubmit = (url: string, username: string, password: string) => {
-    if (selectedRegistry) {
-      // Update the registry login status
-      setRegistries(prev => prev.map(reg => 
-        reg.id === selectedRegistry.id 
-          ? { 
-              ...reg, 
-              isLoggedIn: true, 
-              username,
-              lastLogin: new Date().toISOString()
-            }
-          : reg
-      ));
-      
-      // Update selected registry
-      setSelectedRegistry(prev => prev ? {
-        ...prev,
-        isLoggedIn: true,
-        username,
-        lastLogin: new Date().toISOString()
-      } : null);
-
+  const handleLoginSubmit = async (url: string, username: string, password: string) => {
+    try {
+      await login(url, username, password);
       toast({
         title: "Login successful",
-        description: `Successfully logged in to ${selectedRegistry.name}`,
+        description: `Successfully logged in to registry`,
+      });
+    } catch (error) {
+      toast({
+        title: "Login failed",
+        description: error instanceof Error ? error.message : "Failed to login",
+        variant: "destructive",
       });
     }
   };
 
-  const handleLogout = () => {
-    if (selectedRegistry && selectedRegistry.isLoggedIn) {
-      // Update the registry login status
-      setRegistries(prev => prev.map(reg => 
-        reg.id === selectedRegistry.id 
-          ? { ...reg, isLoggedIn: false, username: undefined }
-          : reg
-      ));
-      
-      // Update selected registry
-      setSelectedRegistry(prev => prev ? {
-        ...prev,
-        isLoggedIn: false,
-        username: undefined
-      } : null);
-
+  const handleLogout = async () => {
+    try {
+      await logout();
       toast({
         title: "Logout successful",
-        description: `Successfully logged out from ${selectedRegistry.name}`,
+        description: `Successfully logged out from registry`,
+      });
+    } catch (error) {
+      toast({
+        title: "Logout failed",
+        description: error instanceof Error ? error.message : "Failed to logout",
+        variant: "destructive",
       });
     }
   };
 
-  const handleSetDefault = () => {
-    if (selectedRegistry && selectedRegistry.isLoggedIn && !selectedRegistry.isDefault) {
-      // Remove default from all registries and set new default
-      setRegistries(prev => prev.map(reg => ({
-        ...reg,
-        isDefault: reg.id === selectedRegistry.id
-      })));
-      
-      // Update selected registry
-      setSelectedRegistry(prev => prev ? { ...prev, isDefault: true } : null);
-
+  const handleSetDefault = async (url: string) => {
+    try {
+      await setDefault(url);
       toast({
         title: "Default registry set",
-        description: `${selectedRegistry.name} is now the default registry`,
+        description: `Registry is now the default`,
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to set default",
+        description: error instanceof Error ? error.message : "Failed to set default registry",
+        variant: "destructive",
       });
     }
   };
 
-  const canLogout = selectedRegistry?.isLoggedIn || false;
-  const canSetDefault = selectedRegistry?.isLoggedIn && !selectedRegistry?.isDefault || false;
+  const canLogin = true;
+  const canLogout = registry?.isLoggedIn || false;
 
   return (
     <div className="h-full flex flex-col">
@@ -101,23 +71,29 @@ export default function RegistryPage() {
         onLogin={handleLogin}
         onLogout={handleLogout}
         onSetDefault={handleSetDefault}
-        selectedRegistryId={selectedRegistry?.id || null}
+        canLogin={canLogin}
         canLogout={canLogout}
-        canSetDefault={canSetDefault}
+        isLoading={isLoading}
       />
       
-      <div className="flex-1 overflow-hidden">
-        <RegistryList
-          registries={registries}
-          selectedRegistryId={selectedRegistry?.id || null}
-          onRegistryClick={handleRegistryClick}
-        />
+      <div className="flex-1 overflow-hidden p-6">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-32">
+            <p className="text-muted-foreground">Loading registry...</p>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-32">
+            <p className="text-red-600">Error: {error}</p>
+          </div>
+        ) : (
+          <RegistryCard registry={registry} />
+        )}
       </div>
 
       <LoginDialog
         open={loginDialogOpen}
         onOpenChange={setLoginDialogOpen}
-        registry={selectedRegistry}
+        registry={registry}
         onLogin={handleLoginSubmit}
       />
     </div>
