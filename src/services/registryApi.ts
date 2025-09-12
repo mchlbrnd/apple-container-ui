@@ -1,5 +1,19 @@
 import { Registry, LoginRequest } from "@/types/registry";
 
+// Global API interface (already defined in containerApi.ts)
+declare global {
+  interface Window {
+    api?: {
+      exec: (command: string, args?: string[], options?: any) => Promise<{ code: number; stdout: string; stderr: string }>;
+      spawn: (command: string, args?: string[], options?: any) => Promise<{ runId: string }>;
+      onSpawnStdout: (handler: (data: string) => void) => () => void;
+      onSpawnStderr: (handler: (data: string) => void) => () => void;
+      onSpawnClose: (handler: (code: number) => void) => () => void;
+      kill: (runId: string, signal?: string) => Promise<{ ok: boolean; error?: string }>;
+    };
+  }
+}
+
 export class RegistryApiError extends Error {
   constructor(message: string, public code?: number, public stderr?: string) {
     super(stderr && stderr.trim() ? `${message}: ${stderr.trim()}` : message);
@@ -8,105 +22,87 @@ export class RegistryApiError extends Error {
 }
 
 export class RegistryApi {
+  private static checkApi() {
+    if (!window.api) {
+      throw new RegistryApiError('Docker API is not available. Please ensure the application is running in the correct environment.');
+    }
+    return window.api;
+  }
+
   /**
    * Get the default registry status
+   * Command: container registry default inspect
    */
   static async getDefaultRegistry(): Promise<Registry | null> {
-    try {
-      // Execute: container registry default inspect
-      const response = await fetch('/api/registry/default/inspect');
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to get default registry');
-      }
+    const api = this.checkApi();
+    const result = await api.exec('container', ['registry', 'default', 'inspect']);
+    
+    if (result.code !== 0) {
+      throw new RegistryApiError('Failed to get default registry', result.code, result.stderr);
+    }
 
+    try {
+      const data = JSON.parse(result.stdout);
+      
       // Parse the registry info from the response
-      // This would need to be adjusted based on actual API response format
       return {
         id: 'default',
-        name: data.name || 'Default Registry',
-        url: data.url || '',
+        name: data.name || 'Docker Hub',
+        url: data.url || 'docker.io',
         username: data.username,
         isLoggedIn: data.isLoggedIn || false,
         isDefault: true,
         lastLogin: data.lastLogin
       };
     } catch (error) {
-      console.error('Failed to get default registry:', error);
-      return null;
+      throw new RegistryApiError('Failed to parse registry inspect response');
     }
   }
 
   /**
-   * Login to registry
+   * Login to a registry
+   * Command: container registry login <registry-url> -u <username> -p <password>
    */
-  static async login(loginRequest: LoginRequest): Promise<void> {
-    try {
-      // Execute: container registry login <registry-url> -u <username> -p <password>
-      const response = await fetch('/api/registry/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(loginRequest),
-      });
+  static async login(request: LoginRequest): Promise<void> {
+    const api = this.checkApi();
+    const result = await api.exec('container', [
+      'registry', 
+      'login', 
+      request.url, 
+      '-u', 
+      request.username, 
+      '-p', 
+      request.password
+    ]);
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Login failed');
-      }
-    } catch (error) {
-      console.error('Registry login failed:', error);
-      throw error;
+    if (result.code !== 0) {
+      throw new RegistryApiError(`Failed to login to registry ${request.url}`, result.code, result.stderr);
     }
   }
 
   /**
-   * Logout from registry
+   * Logout from a registry
+   * Command: container registry logout <registry-url>
    */
   static async logout(registryUrl: string): Promise<void> {
-    try {
-      // Execute: container registry logout <registry-url>
-      const response = await fetch('/api/registry/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: registryUrl }),
-      });
+    const api = this.checkApi();
+    const result = await api.exec('container', ['registry', 'logout', registryUrl]);
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Logout failed');
-      }
-    } catch (error) {
-      console.error('Registry logout failed:', error);
-      throw error;
+    if (result.code !== 0) {
+      throw new RegistryApiError(`Failed to logout from registry ${registryUrl}`, result.code, result.stderr);
     }
   }
 
   /**
-   * Set default registry
+   * Set the default registry
+   * Command: container registry default set <registry-url>
    */
   static async setDefault(registryUrl: string): Promise<void> {
-    try {
-      // Execute: container registry default set <registry-url>
-      const response = await fetch('/api/registry/default/set', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: registryUrl }),
-      });
+    const api = this.checkApi();
+    const result = await api.exec('container', ['registry', 'default', 'set', registryUrl]);
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to set default registry');
-      }
-    } catch (error) {
-      console.error('Failed to set default registry:', error);
-      throw error;
+    if (result.code !== 0) {
+      throw new RegistryApiError(`Failed to set default registry to ${registryUrl}`, result.code, result.stderr);
     }
   }
 }
