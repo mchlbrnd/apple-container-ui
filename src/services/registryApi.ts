@@ -1,5 +1,12 @@
 import { Registry, LoginRequest } from "@/types/registry";
 
+export class RegistryApiError extends Error {
+  constructor(message: string, public code?: number, public stderr?: string) {
+    super(stderr && stderr.trim() ? `${message}: ${stderr.trim()}` : message);
+    this.name = 'RegistryApiError';
+  }
+}
+
 export class RegistryApi {
   /**
    * Get the default registry status

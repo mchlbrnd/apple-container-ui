@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { Registry } from "@/types/registry";
-import { RegistryApi } from "@/services/registryApi";
+import { RegistryApi, RegistryApiError } from "@/services/registryApi";
 import { mockRegistry } from "@/data/mockRegistry";
+import { useToast } from "@/hooks/use-toast";
 
 export function useRegistry() {
   const [registry, setRegistry] = useState<Registry | null>(mockRegistry);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const fetchRegistry = async () => {
     setIsLoading(true);
@@ -15,7 +17,13 @@ export function useRegistry() {
       const data = await RegistryApi.getDefaultRegistry();
       setRegistry(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch registry');
+      const message = err instanceof RegistryApiError ? err.message : 'Failed to fetch registry';
+      setError(message);
+      toast({
+        title: "Error loading registry",
+        description: message,
+        variant: "destructive"
+      });
       // Fallback to mock data on error
       setRegistry(mockRegistry);
     } finally {
@@ -28,6 +36,11 @@ export function useRegistry() {
     try {
       await RegistryApi.login({ url, username, password });
       
+      toast({
+        title: "Registry Login Successful",
+        description: `Successfully logged in to ${url}`,
+      });
+      
       // Update local state
       if (registry) {
         setRegistry({
@@ -39,7 +52,13 @@ export function useRegistry() {
         });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      const message = err instanceof RegistryApiError ? err.message : 'Login failed';
+      setError(message);
+      toast({
+        title: "Registry Login Failed",
+        description: message,
+        variant: "destructive"
+      });
       throw err;
     }
   };
@@ -51,6 +70,11 @@ export function useRegistry() {
     try {
       await RegistryApi.logout(registry.url);
       
+      toast({
+        title: "Registry Logout Successful",
+        description: `Successfully logged out from ${registry.url}`,
+      });
+      
       // Update local state
       setRegistry(prev => prev ? {
         ...prev,
@@ -59,7 +83,13 @@ export function useRegistry() {
         lastLogin: undefined
       } : null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Logout failed');
+      const message = err instanceof RegistryApiError ? err.message : 'Logout failed';
+      setError(message);
+      toast({
+        title: "Registry Logout Failed",
+        description: message,
+        variant: "destructive"
+      });
       throw err;
     }
   };
@@ -68,6 +98,11 @@ export function useRegistry() {
     setError(null);
     try {
       await RegistryApi.setDefault(url);
+      
+      toast({
+        title: "Default Registry Set",
+        description: `Successfully set ${url} as default registry`,
+      });
       
       // Update local state
       if (registry) {
@@ -78,7 +113,13 @@ export function useRegistry() {
         });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to set default registry');
+      const message = err instanceof RegistryApiError ? err.message : 'Failed to set default registry';
+      setError(message);
+      toast({
+        title: "Failed to Set Default Registry",
+        description: message,
+        variant: "destructive"
+      });
       throw err;
     }
   };

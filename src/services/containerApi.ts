@@ -16,7 +16,7 @@ declare global {
 
 export class ContainerApiError extends Error {
   constructor(message: string, public code?: number, public stderr?: string) {
-    super(message);
+    super(stderr && stderr.trim() ? `${message}: ${stderr.trim()}` : message);
     this.name = 'ContainerApiError';
   }
 }
