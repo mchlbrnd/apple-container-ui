@@ -31,10 +31,10 @@ export function useRegistry() {
     }
   };
 
-  const login = async (url: string, username: string, password: string) => {
+  const login = async (url: string, username: string, password: string, scheme?: 'http' | 'https' | 'auto') => {
     setError(null);
     try {
-      await RegistryApi.login({ url, username, password });
+      await RegistryApi.login({ url, username, password, scheme });
       
       toast({
         title: "Registry Login Successful",

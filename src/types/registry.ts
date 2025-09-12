@@ -12,4 +12,5 @@ export interface LoginRequest {
   url: string;
   username: string;
   password: string;
+  scheme?: 'http' | 'https' | 'auto';
 }

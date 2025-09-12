@@ -83,19 +83,28 @@ export class RegistryApi {
 
   /**
    * Login to a registry
-   * Command: container registry login <registry-url> -u <username> -p <password>
+   * Command: container registry login <registry-url> -u <username> --password-stdin [--scheme <scheme>]
    */
   static async login(request: LoginRequest): Promise<void> {
     const api = this.checkApi();
-    const result = await api.exec('container', [
+    const args = [
       'registry', 
       'login', 
       request.url, 
       '-u', 
       request.username, 
-      '-p', 
-      request.password
-    ]);
+      '--password-stdin'
+    ];
+
+    // Add scheme option if provided
+    if (request.scheme) {
+      args.push('--scheme', request.scheme);
+    }
+
+    // Use spawn to handle password via stdin
+    const result = await api.exec('container', args, {
+      input: request.password
+    });
 
     if (result.code !== 0) {
       throw new RegistryApiError(`Failed to login to registry ${request.url}`, result.code, result.stderr);

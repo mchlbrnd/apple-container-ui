@@ -14,9 +14,9 @@ export default function RegistryPage() {
     setLoginDialogOpen(true);
   };
 
-  const handleLoginSubmit = async (url: string, username: string, password: string) => {
+  const handleLoginSubmit = async (url: string, username: string, password: string, scheme?: 'http' | 'https' | 'auto') => {
     try {
-      await login(url, username, password);
+      await login(url, username, password, scheme);
       toast({
         title: "Login successful",
         description: `Successfully logged in to registry`,
