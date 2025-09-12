@@ -33,32 +33,78 @@ export class ContainerApi {
     const api = this.checkApi();
     const args = ['list'];
     if (includeAll) args.push('--all');
-    args.push('--format', 'json');
-
-    const result = await api.exec('container', args);
     
+    // Try with JSON format first
+    let result = await api.exec('container', [...args, '--format', 'json']);
+    let useJsonFormat = true;
+    
+    // If JSON format fails, try without it
     if (result.code !== 0) {
-      throw new ContainerApiError('Failed to list containers', result.code, result.stderr);
+      result = await api.exec('container', args);
+      useJsonFormat = false;
+      
+      if (result.code !== 0) {
+        throw new ContainerApiError('Failed to list containers', result.code, result.stderr);
+      }
     }
 
     try {
-      const rawContainers = JSON.parse(result.stdout);
-      
-      // Transform the raw container data to our Container interface
-      const containers: Container[] = rawContainers.map((raw: any) => ({
-        id: raw.configuration?.id || raw.id,
-        name: raw.configuration?.networks?.[0]?.options?.hostname || raw.configuration?.id?.substring(0, 12) || 'unknown',
-        image: raw.configuration?.image?.reference || raw.image,
-        status: raw.status || 'unknown',
-        ports: raw.configuration?.publishedPorts?.map((port: any) => 
-          `${port.hostPort}:${port.containerPort}/${port.protocol}`
-        ) || [],
-        networks: raw.networks || [],
-        labels: raw.configuration?.labels || {},
-        configuration: raw.configuration
-      }));
-      
-      return containers;
+      if (useJsonFormat) {
+        // Parse JSON output
+        const rawContainers = JSON.parse(result.stdout);
+        return rawContainers.map((raw: any) => ({
+          id: raw.configuration?.id || raw.id,
+          name: raw.configuration?.networks?.[0]?.options?.hostname || raw.configuration?.id?.substring(0, 12) || 'unknown',
+          image: raw.configuration?.image?.reference || raw.image,
+          status: (raw.status as Container['status']) || 'created',
+          ports: raw.configuration?.publishedPorts?.map((port: any) => 
+            `${port.hostPort}:${port.containerPort}/${port.protocol}`
+          ) || [],
+          networks: raw.networks || [],
+          labels: raw.configuration?.labels || {},
+          configuration: raw.configuration
+        }));
+      } else {
+        // Parse text output - get detailed info via inspect for each container
+        const lines = result.stdout.trim().split('\n').filter(line => line.trim());
+        const containers: Container[] = [];
+        
+        for (const line of lines) {
+          // Extract container ID from the line (first column)
+          const parts = line.trim().split(/\s+/);
+          if (parts.length > 0) {
+            const containerId = parts[0];
+            try {
+              // Get detailed info via inspect
+              const inspectData = await this.inspectContainer(containerId);
+              containers.push({
+                id: inspectData.id || containerId,
+                name: inspectData.name || containerId.substring(0, 12),
+                image: inspectData.image || 'unknown',
+                status: (inspectData.status as Container['status']) || 'created',
+                ports: inspectData.ports || [],
+                networks: inspectData.networks || [],
+                labels: inspectData.labels || {},
+                configuration: inspectData.configuration
+              });
+            } catch (error) {
+              // If inspect fails, create basic container info
+              containers.push({
+                id: containerId,
+                name: containerId.substring(0, 12),
+                image: 'unknown',
+                status: 'created' as Container['status'],
+                ports: [],
+                networks: [],
+                labels: {},
+                configuration: undefined
+              });
+            }
+          }
+        }
+        
+        return containers;
+      }
     } catch (error) {
       throw new ContainerApiError('Failed to parse container list response');
     }
