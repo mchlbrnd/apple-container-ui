@@ -8,6 +8,7 @@ export function useContainers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stoppingContainers, setStoppingContainers] = useState<Set<string>>(new Set());
+  const [startingContainers, setStartingContainers] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const fetchContainers = useCallback(async () => {
@@ -16,7 +17,7 @@ export function useContainers() {
       setError(null);
       const containerList = await ContainerApi.listContainers();
       
-      // Apply stopping status for containers that are still in the stopping set
+      // Apply stopping/starting status for containers that are in transition
       const updatedContainers = containerList.map(container => {
         if (stoppingContainers.has(container.id)) {
           // If container is still running, keep it as stopping
@@ -32,6 +33,22 @@ export function useContainers() {
             return container;
           }
         }
+        
+        if (startingContainers.has(container.id)) {
+          // If container is running, remove from starting set
+          if (container.status === 'running') {
+            setStartingContainers(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(container.id);
+              return newSet;
+            });
+            return container;
+          } else {
+            // Container still not running, keep it as starting
+            return { ...container, status: 'starting' as Container['status'] };
+          }
+        }
+        
         return container;
       });
       
@@ -57,10 +74,18 @@ export function useContainers() {
     } finally {
       setLoading(false);
     }
-  }, [toast, stoppingContainers]);
+  }, [toast, stoppingContainers, startingContainers]);
 
   const startContainer = useCallback(async (containerId: string) => {
     try {
+      // Immediately set container to starting status
+      setStartingContainers(prev => new Set(prev).add(containerId));
+      setContainers(prev => prev.map(container => 
+        container.id === containerId 
+          ? { ...container, status: 'starting' as Container['status'] }
+          : container
+      ));
+
       await ContainerApi.startContainer(containerId);
       toast({
         title: "Container Started",
@@ -68,12 +93,20 @@ export function useContainers() {
       });
       await fetchContainers();
     } catch (err) {
+      // Remove from starting set if error occurs
+      setStartingContainers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(containerId);
+        return newSet;
+      });
+      
       const message = err instanceof ContainerApiError ? err.message : 'Failed to start container';
       toast({
         title: "Error",
         description: message,
         variant: "destructive",
       });
+      await fetchContainers(); // Refresh to get actual status
     }
   }, [fetchContainers, toast]);
 

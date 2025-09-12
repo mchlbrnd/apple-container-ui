@@ -23,6 +23,7 @@ const statusColors = {
   running: "bg-success text-success-foreground",
   stopped: "bg-muted text-muted-foreground", 
   stopping: "bg-warning text-warning-foreground",
+  starting: "bg-primary text-primary-foreground",
   restarting: "bg-primary text-primary-foreground",
   removing: "bg-destructive text-destructive-foreground",
   created: "bg-accent text-accent-foreground",
@@ -225,6 +226,17 @@ export function ContainerDetail({
               Start
             </Button>
           )}
+          {container.status === 'starting' && (
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="gap-2"
+              disabled
+            >
+              <Play className="h-3 w-3" />
+              Starting...
+            </Button>
+          )}
           {(container.status === 'running' || container.status === 'stopping') && (
             <Button 
               size="sm" 
@@ -242,7 +254,7 @@ export function ContainerDetail({
             variant="outline" 
             className="gap-2"
             onClick={() => onRestart?.(container.id)}
-            disabled={container.status === 'stopping'}
+            disabled={container.status === 'stopping' || container.status === 'starting'}
           >
             <RotateCcw className="h-3 w-3" />
             Restart
