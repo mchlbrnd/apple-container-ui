@@ -110,23 +110,6 @@ export function useContainers() {
     }
   }, [fetchContainers, toast]);
 
-  const pauseContainer = useCallback(async (containerId: string) => {
-    try {
-      await ContainerApi.pauseContainer(containerId);
-      toast({
-        title: "Container Paused",
-        description: `Container ${containerId.substring(0, 12)} paused successfully`,
-      });
-      await fetchContainers();
-    } catch (err) {
-      const message = err instanceof ContainerApiError ? err.message : 'Failed to pause container';
-      toast({
-        title: "Error",
-        description: message,
-        variant: "destructive",
-      });
-    }
-  }, [fetchContainers, toast]);
 
   const killContainer = useCallback(async (containerId: string) => {
     try {
@@ -185,7 +168,6 @@ export function useContainers() {
     stopContainer,
     deleteContainer,
     restartContainer,
-    pauseContainer,
     killContainer,
     runContainer,
   };

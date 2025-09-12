@@ -13,7 +13,7 @@ export default function ContainersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   
-  const { containers, loading, error, refresh, startContainer, stopContainer, deleteContainer, restartContainer, pauseContainer, killContainer, runContainer } = useContainers();
+  const { containers, loading, error, refresh, startContainer, stopContainer, deleteContainer, restartContainer, killContainer, runContainer } = useContainers();
 
   const filteredContainers = useMemo(() => {
     return containers.filter((container) => {
@@ -131,7 +131,6 @@ export default function ContainersPage() {
               onStart={startContainer}
               onStop={stopContainer}
               onRestart={restartContainer}
-              onPause={pauseContainer}
               onDelete={deleteContainer}
             />
           ) : (

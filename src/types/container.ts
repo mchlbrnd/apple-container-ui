@@ -2,7 +2,7 @@ export interface Container {
   id: string;
   name: string;
   image: string;
-  status: 'running' | 'stopped' | 'paused' | 'restarting' | 'removing' | 'created' | 'exited';
+  status: 'running' | 'stopped' | 'restarting' | 'removing' | 'created' | 'exited';
   ports: string[];
   networks?: ContainerNetwork[];
   labels?: Record<string, string>;

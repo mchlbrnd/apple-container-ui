@@ -33,7 +33,7 @@ export const mockContainers: Container[] = [
     id: "a5678901234ef5678901234ef5678901234ef56789",
     name: "monitoring-grafana",
     image: "grafana/grafana:latest",
-    status: "paused",
+    status: "created",
     ports: ["3030:3000"],
   },
   {

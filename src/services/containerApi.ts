@@ -153,22 +153,33 @@ export class ContainerApi {
   }
 
   static async restartContainer(containerId: string): Promise<void> {
-    const api = this.checkApi();
-    const result = await api.exec('container', ['restart', containerId]);
+    // First stop the container
+    await this.stopContainer(containerId);
     
-    if (result.code !== 0) {
-      throw new ContainerApiError(`Failed to restart container ${containerId}`, result.code, result.stderr);
+    // Wait for container to be stopped
+    let attempts = 0;
+    const maxAttempts = 30; // 15 seconds timeout
+    
+    while (attempts < maxAttempts) {
+      try {
+        const containers = await this.listContainers();
+        const container = containers.find(c => c.id === containerId);
+        
+        if (container && (container.status === 'stopped' || container.status === 'exited')) {
+          break;
+        }
+      } catch (error) {
+        // Continue waiting if inspect fails
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+      attempts++;
     }
+    
+    // Then start the container
+    await this.startContainer(containerId);
   }
 
-  static async pauseContainer(containerId: string): Promise<void> {
-    const api = this.checkApi();
-    const result = await api.exec('container', ['pause', containerId]);
-    
-    if (result.code !== 0) {
-      throw new ContainerApiError(`Failed to pause container ${containerId}`, result.code, result.stderr);
-    }
-  }
 
   static async killContainer(containerId: string): Promise<void> {
     const api = this.checkApi();

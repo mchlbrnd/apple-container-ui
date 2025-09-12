@@ -16,17 +16,16 @@ interface ContainerDetailProps {
   onStart?: (containerId: string) => void;
   onStop?: (containerId: string) => void;
   onRestart?: (containerId: string) => void;
-  onPause?: (containerId: string) => void;
   onDelete?: (containerId: string) => void;
 }
 
 const statusColors = {
   running: "bg-success text-success-foreground",
   stopped: "bg-muted text-muted-foreground", 
-  paused: "bg-warning text-warning-foreground",
   restarting: "bg-primary text-primary-foreground",
   removing: "bg-destructive text-destructive-foreground",
   created: "bg-accent text-accent-foreground",
+  exited: "bg-muted text-muted-foreground",
 };
 
 // Mock data for detailed view
@@ -71,7 +70,6 @@ export function ContainerDetail({
   onStart, 
   onStop, 
   onRestart, 
-  onPause, 
   onDelete 
 }: ContainerDetailProps) {
   const [inspectData, setInspectData] = useState<any>(null);
@@ -215,7 +213,7 @@ export function ContainerDetail({
         
         {/* Quick Actions */}
         <div className="flex gap-2 mt-3">
-          {container.status === 'stopped' && (
+          {(container.status === 'stopped' || container.status === 'exited' || container.status === 'created') && (
             <Button 
               size="sm" 
               variant="outline" 
@@ -227,26 +225,15 @@ export function ContainerDetail({
             </Button>
           )}
           {container.status === 'running' && (
-            <>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="gap-2"
-                onClick={() => onStop?.(container.id)}
-              >
-                <Square className="h-3 w-3" />
-                Stop
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="gap-2"
-                onClick={() => onPause?.(container.id)}
-              >
-                <Pause className="h-3 w-3" />
-                Pause
-              </Button>
-            </>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="gap-2"
+              onClick={() => onStop?.(container.id)}
+            >
+              <Square className="h-3 w-3" />
+              Stop
+            </Button>
           )}
           <Button 
             size="sm" 
