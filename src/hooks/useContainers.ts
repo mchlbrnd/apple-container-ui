@@ -15,11 +15,18 @@ export function useContainers() {
     try {
       setLoading(true);
       setError(null);
+      console.log('Fetching containers...');
       const containerList = await ContainerApi.listContainers();
+      console.log('Raw container list:', containerList);
+      console.log('Current startingContainers:', startingContainers);
+      console.log('Current stoppingContainers:', stoppingContainers);
       
       // Apply stopping/starting status for containers that are in transition
       const updatedContainers = containerList.map(container => {
+        console.log(`Processing container ${container.id}, status: ${container.status}`);
+        
         if (stoppingContainers.has(container.id)) {
+          console.log(`Container ${container.id} is in stopping set`);
           // If container is still running, keep it as stopping
           if (container.status === 'running') {
             return { ...container, status: 'stopping' as Container['status'] };
@@ -35,8 +42,10 @@ export function useContainers() {
         }
         
         if (startingContainers.has(container.id)) {
+          console.log(`Container ${container.id} is in starting set, current status: ${container.status}`);
           // If container is running, remove from starting set
           if (container.status === 'running') {
+            console.log(`Container ${container.id} is now running, removing from starting set`);
             setStartingContainers(prev => {
               const newSet = new Set(prev);
               newSet.delete(container.id);
@@ -45,6 +54,7 @@ export function useContainers() {
             return container;
           } else {
             // Container still not running, keep it as starting
+            console.log(`Container ${container.id} still not running, keeping as starting`);
             return { ...container, status: 'starting' as Container['status'] };
           }
         }
@@ -52,8 +62,10 @@ export function useContainers() {
         return container;
       });
       
+      console.log('Updated containers:', updatedContainers);
       setContainers(updatedContainers);
     } catch (err) {
+      console.log('Error fetching containers:', err);
       const message = err instanceof ContainerApiError ? err.message : 'Failed to fetch containers';
       setError(message);
       
@@ -78,21 +90,34 @@ export function useContainers() {
 
   const startContainer = useCallback(async (containerId: string) => {
     try {
+      console.log('Starting container:', containerId);
+      
       // Immediately set container to starting status
-      setStartingContainers(prev => new Set(prev).add(containerId));
+      setStartingContainers(prev => {
+        const newSet = new Set(prev).add(containerId);
+        console.log('Starting containers set:', newSet);
+        return newSet;
+      });
+      
       setContainers(prev => prev.map(container => 
         container.id === containerId 
           ? { ...container, status: 'starting' as Container['status'] }
           : container
       ));
 
+      console.log('About to call ContainerApi.startContainer');
       await ContainerApi.startContainer(containerId);
+      console.log('ContainerApi.startContainer completed');
+      
       toast({
         title: "Container Started",
         description: `Container ${containerId.substring(0, 12)} started successfully`,
       });
+      
+      console.log('About to fetch containers');
       await fetchContainers();
     } catch (err) {
+      console.log('Error starting container:', err);
       // Remove from starting set if error occurs
       setStartingContainers(prev => {
         const newSet = new Set(prev);
