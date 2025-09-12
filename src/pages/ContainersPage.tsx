@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ContainerToolbar } from "@/components/containers/ContainerToolbar";
 import { ContainerTable } from "@/components/containers/ContainerTable";
 import { ContainerDetail } from "@/components/containers/ContainerDetail";
@@ -29,8 +29,42 @@ export default function ContainersPage() {
     });
   }, [containers, searchValue, statusFilter]);
 
+  // Update selected container when containers list changes
+  useEffect(() => {
+    if (selectedContainer) {
+      const updatedContainer = containers.find(c => c.id === selectedContainer.id);
+      if (updatedContainer) {
+        setSelectedContainer(updatedContainer);
+      } else {
+        // Container no longer exists, clear selection
+        setSelectedContainer(undefined);
+      }
+    }
+  }, [containers, selectedContainer?.id]);
+
   const handleContainerSelect = (container: Container) => {
     setSelectedContainer(container);
+  };
+
+  // Wrapper functions to ensure container list refresh and selection update
+  const handleDetailStart = async (containerId: string) => {
+    await startContainer(containerId);
+  };
+
+  const handleDetailStop = async (containerId: string) => {
+    await stopContainer(containerId);
+  };
+
+  const handleDetailRestart = async (containerId: string) => {
+    await restartContainer(containerId);
+  };
+
+  const handleDetailDelete = async (containerId: string) => {
+    await deleteContainer(containerId);
+    // Clear selection if the deleted container was selected
+    if (selectedContainer && selectedContainer.id === containerId) {
+      setSelectedContainer(undefined);
+    }
   };
 
   const handleRun = () => {
@@ -128,10 +162,10 @@ export default function ContainersPage() {
           {selectedContainer ? (
             <ContainerDetail 
               container={selectedContainer}
-              onStart={startContainer}
-              onStop={stopContainer}
-              onRestart={restartContainer}
-              onDelete={deleteContainer}
+              onStart={handleDetailStart}
+              onStop={handleDetailStop}
+              onRestart={handleDetailRestart}
+              onDelete={handleDetailDelete}
             />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground">
