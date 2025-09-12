@@ -41,22 +41,44 @@ export class RegistryApi {
       throw new RegistryApiError('Failed to get default registry', result.code, result.stderr);
     }
 
-    try {
-      const data = JSON.parse(result.stdout);
-      
-      // Parse the registry info from the response
-      return {
-        id: 'default',
-        name: data.name || 'Docker Hub',
-        url: data.url || 'docker.io',
-        username: data.username,
-        isLoggedIn: data.isLoggedIn || false,
-        isDefault: true,
-        lastLogin: data.lastLogin
-      };
-    } catch (error) {
-      throw new RegistryApiError('Failed to parse registry inspect response');
+    // Parse plain text response
+    const output = result.stdout.trim();
+    
+    // Default registry info - the response is plain text
+    // Extract URL and other info from the plain text output
+    const lines = output.split('\n');
+    let url = 'docker.io';
+    let isLoggedIn = false;
+    let username = undefined;
+    
+    // Parse the plain text output to extract registry information
+    for (const line of lines) {
+      if (line.includes('Registry:') || line.includes('URL:')) {
+        const match = line.match(/:\s*(.+)$/);
+        if (match) {
+          url = match[1].trim();
+        }
+      }
+      if (line.includes('Logged in') || line.includes('authenticated')) {
+        isLoggedIn = true;
+      }
+      if (line.includes('Username:') || line.includes('User:')) {
+        const match = line.match(/:\s*(.+)$/);
+        if (match) {
+          username = match[1].trim();
+        }
+      }
     }
+    
+    return {
+      id: 'default',
+      name: url === 'docker.io' ? 'Docker Hub' : url,
+      url,
+      username,
+      isLoggedIn,
+      isDefault: true,
+      lastLogin: undefined
+    };
   }
 
   /**
