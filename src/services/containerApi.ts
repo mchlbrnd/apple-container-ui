@@ -66,7 +66,7 @@ export class ContainerApi {
 
   static async inspectContainer(containerId: string): Promise<any> {
     const api = this.checkApi();
-    const result = await api.exec('container', ['inspect', containerId, '--format', 'json']);
+    const result = await api.exec('container', ['inspect', containerId]);
     
     if (result.code !== 0) {
       throw new ContainerApiError(`Failed to inspect container ${containerId}`, result.code, result.stderr);
