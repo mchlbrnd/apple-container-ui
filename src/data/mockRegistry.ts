@@ -2,8 +2,8 @@ import { Registry } from "@/types/registry";
 
 export const mockRegistry: Registry = {
   id: "default",
-  name: "Default Registry",
-  url: "https://index.docker.io/v1/",
+  name: "Docker Hub",
+  url: "docker.io",
   username: "myusername",
   isLoggedIn: true,
   isDefault: true,
