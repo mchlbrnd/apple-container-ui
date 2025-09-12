@@ -25,6 +25,7 @@ const statusColors = {
   running: "bg-success text-success-foreground",
   stopped: "bg-muted text-muted-foreground", 
   exited: "bg-muted text-muted-foreground",
+  stopping: "bg-warning text-warning-foreground",
   restarting: "bg-primary text-primary-foreground",
   removing: "bg-destructive text-destructive-foreground",
   created: "bg-accent text-accent-foreground",

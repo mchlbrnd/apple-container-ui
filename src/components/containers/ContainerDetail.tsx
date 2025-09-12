@@ -22,6 +22,7 @@ interface ContainerDetailProps {
 const statusColors = {
   running: "bg-success text-success-foreground",
   stopped: "bg-muted text-muted-foreground", 
+  stopping: "bg-warning text-warning-foreground",
   restarting: "bg-primary text-primary-foreground",
   removing: "bg-destructive text-destructive-foreground",
   created: "bg-accent text-accent-foreground",
@@ -224,15 +225,16 @@ export function ContainerDetail({
               Start
             </Button>
           )}
-          {container.status === 'running' && (
+          {(container.status === 'running' || container.status === 'stopping') && (
             <Button 
               size="sm" 
               variant="outline" 
               className="gap-2"
               onClick={() => onStop?.(container.id)}
+              disabled={container.status === 'stopping'}
             >
               <Square className="h-3 w-3" />
-              Stop
+              {container.status === 'stopping' ? 'Stopping...' : 'Stop'}
             </Button>
           )}
           <Button 
@@ -240,6 +242,7 @@ export function ContainerDetail({
             variant="outline" 
             className="gap-2"
             onClick={() => onRestart?.(container.id)}
+            disabled={container.status === 'stopping'}
           >
             <RotateCcw className="h-3 w-3" />
             Restart

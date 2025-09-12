@@ -7,6 +7,7 @@ export function useContainers() {
   const [containers, setContainers] = useState<Container[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stoppingContainers, setStoppingContainers] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const fetchContainers = useCallback(async () => {
@@ -14,7 +15,27 @@ export function useContainers() {
       setLoading(true);
       setError(null);
       const containerList = await ContainerApi.listContainers();
-      setContainers(containerList);
+      
+      // Apply stopping status for containers that are still in the stopping set
+      const updatedContainers = containerList.map(container => {
+        if (stoppingContainers.has(container.id)) {
+          // If container is still running, keep it as stopping
+          if (container.status === 'running') {
+            return { ...container, status: 'stopping' as Container['status'] };
+          } else {
+            // Container has stopped, remove from stopping set
+            setStoppingContainers(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(container.id);
+              return newSet;
+            });
+            return container;
+          }
+        }
+        return container;
+      });
+      
+      setContainers(updatedContainers);
     } catch (err) {
       const message = err instanceof ContainerApiError ? err.message : 'Failed to fetch containers';
       setError(message);
@@ -36,7 +57,7 @@ export function useContainers() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, stoppingContainers]);
 
   const startContainer = useCallback(async (containerId: string) => {
     try {
@@ -58,6 +79,14 @@ export function useContainers() {
 
   const stopContainer = useCallback(async (containerId: string) => {
     try {
+      // Immediately set container to stopping status
+      setStoppingContainers(prev => new Set(prev).add(containerId));
+      setContainers(prev => prev.map(container => 
+        container.id === containerId 
+          ? { ...container, status: 'stopping' as Container['status'] }
+          : container
+      ));
+
       await ContainerApi.stopContainer(containerId);
       toast({
         title: "Container Stopped",
@@ -65,12 +94,20 @@ export function useContainers() {
       });
       await fetchContainers();
     } catch (err) {
+      // Remove from stopping set if error occurs
+      setStoppingContainers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(containerId);
+        return newSet;
+      });
+      
       const message = err instanceof ContainerApiError ? err.message : 'Failed to stop container';
       toast({
         title: "Error",
         description: message,
         variant: "destructive",
       });
+      await fetchContainers(); // Refresh to get actual status
     }
   }, [fetchContainers, toast]);
 
@@ -94,19 +131,43 @@ export function useContainers() {
 
   const restartContainer = useCallback(async (containerId: string) => {
     try {
+      // Immediately set container to stopping status since restart involves stopping
+      setStoppingContainers(prev => new Set(prev).add(containerId));
+      setContainers(prev => prev.map(container => 
+        container.id === containerId 
+          ? { ...container, status: 'stopping' as Container['status'] }
+          : container
+      ));
+
       await ContainerApi.restartContainer(containerId);
+      
+      // Remove from stopping set after successful restart
+      setStoppingContainers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(containerId);
+        return newSet;
+      });
+      
       toast({
         title: "Container Restarted",
         description: `Container ${containerId.substring(0, 12)} restarted successfully`,
       });
       await fetchContainers();
     } catch (err) {
+      // Remove from stopping set if error occurs
+      setStoppingContainers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(containerId);
+        return newSet;
+      });
+      
       const message = err instanceof ContainerApiError ? err.message : 'Failed to restart container';
       toast({
         title: "Error",
         description: message,
         variant: "destructive",
       });
+      await fetchContainers(); // Refresh to get actual status
     }
   }, [fetchContainers, toast]);
 
