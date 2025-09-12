@@ -6,6 +6,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/types/container";
 import { Play, Square, Pause, RotateCcw, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ContainerApi, ContainerApiError } from "@/services/containerApi";
+import { useToast } from "@/hooks/use-toast";
 
 interface ContainerDetailProps {
   container: Container;
@@ -58,6 +61,93 @@ const mockLogs = `2024-01-15T10:30:15Z [INFO] Starting application server
 2024-01-15T10:33:12Z [INFO] Response sent: 200 OK`;
 
 export function ContainerDetail({ container }: ContainerDetailProps) {
+  const [inspectData, setInspectData] = useState<any>(null);
+  const [logs, setLogs] = useState<string>("");
+  const [loadingInspect, setLoadingInspect] = useState(false);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [followingLogs, setFollowingLogs] = useState(false);
+  const [logRunId, setLogRunId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (container) {
+      loadInspectData();
+    }
+  }, [container]);
+
+  const loadInspectData = async () => {
+    try {
+      setLoadingInspect(true);
+      const data = await ContainerApi.inspectContainer(container.id);
+      setInspectData(data);
+    } catch (err) {
+      const message = err instanceof ContainerApiError ? err.message : 'Failed to inspect container';
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingInspect(false);
+    }
+  };
+
+  const loadLogs = async (follow = false) => {
+    try {
+      setLoadingLogs(true);
+      const result = await ContainerApi.getContainerLogs(container.id, follow);
+      
+      if (follow && result.runId) {
+        setFollowingLogs(true);
+        setLogRunId(result.runId);
+        
+        // Set up log streaming handlers
+        const unsubscribeStdout = window.api?.onSpawnStdout?.((data) => {
+          setLogs(prev => prev + data);
+        });
+        
+        const unsubscribeStderr = window.api?.onSpawnStderr?.((data) => {
+          setLogs(prev => prev + data);
+        });
+        
+        const unsubscribeClose = window.api?.onSpawnClose?.(() => {
+          setFollowingLogs(false);
+          setLogRunId(null);
+          unsubscribeStdout?.();
+          unsubscribeStderr?.();
+          unsubscribeClose?.();
+        });
+        
+      } else if (result.logs) {
+        setLogs(result.logs);
+      }
+    } catch (err) {
+      const message = err instanceof ContainerApiError ? err.message : 'Failed to load logs';
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const stopFollowingLogs = async () => {
+    if (logRunId && window.api?.kill) {
+      try {
+        await window.api.kill(logRunId);
+        setFollowingLogs(false);
+        setLogRunId(null);
+      } catch (err) {
+        console.error('Failed to stop log following:', err);
+      }
+    }
+  };
+
+  const clearLogs = () => {
+    setLogs("");
+  };
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -174,21 +264,56 @@ export function ContainerDetail({ container }: ContainerDetailProps) {
             
             <TabsContent value="inspect" className="h-full">
               <ScrollArea className="h-96 w-full rounded-md border p-4">
-                <pre className="text-xs font-mono">
-                  {JSON.stringify(mockInspectData, null, 2)}
-                </pre>
+                {loadingInspect ? (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-sm text-muted-foreground">Loading inspect data...</p>
+                  </div>
+                ) : inspectData ? (
+                  <pre className="text-xs font-mono">
+                    {JSON.stringify(inspectData, null, 2)}
+                  </pre>
+                ) : (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-sm text-muted-foreground">No inspect data available</p>
+                  </div>
+                )}
               </ScrollArea>
             </TabsContent>
             
             <TabsContent value="logs" className="h-full">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline">Follow</Button>
-                  <Button size="sm" variant="outline">Clear</Button>
+                  {followingLogs ? (
+                    <Button size="sm" variant="outline" onClick={stopFollowingLogs}>
+                      Stop Following
+                    </Button>
+                  ) : (
+                    <>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => loadLogs(false)}
+                        disabled={loadingLogs}
+                      >
+                        Load Logs
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => loadLogs(true)}
+                        disabled={loadingLogs}
+                      >
+                        Follow
+                      </Button>
+                    </>
+                  )}
+                  <Button size="sm" variant="outline" onClick={clearLogs}>
+                    Clear
+                  </Button>
                 </div>
                 <ScrollArea className="h-80 w-full rounded-md border p-4 bg-muted">
                   <pre className="text-xs font-mono whitespace-pre-wrap">
-                    {mockLogs}
+                    {logs || "No logs available. Click 'Load Logs' to fetch container logs."}
                   </pre>
                 </ScrollArea>
               </div>
