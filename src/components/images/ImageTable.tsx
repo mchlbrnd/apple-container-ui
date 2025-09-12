@@ -58,10 +58,10 @@ export function ImageTable({
               />
             </TableHead>
             <TableHead className="font-medium">Name:Tag</TableHead>
-            <TableHead className="font-medium">ID/Digest</TableHead>
+            <TableHead className="font-medium">Digest</TableHead>
             <TableHead className="font-medium">Size</TableHead>
-            <TableHead className="font-medium">Created</TableHead>
-            <TableHead className="font-medium">Registry</TableHead>
+            <TableHead className="font-medium">Source</TableHead>
+            <TableHead className="font-medium">Type</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -83,25 +83,33 @@ export function ImageTable({
               </TableCell>
               <TableCell className="font-medium">
                 <div className="flex flex-col">
-                  <span>{image.name}</span>
+                  <span>{image.name || image.repository}</span>
                   <span className="text-xs text-muted-foreground">{image.tag}</span>
                 </div>
               </TableCell>
               <TableCell>
                 <div className="font-mono text-xs">
-                  {image.digest.substring(0, 20)}...
+                  {image.descriptor?.digest ? 
+                    image.descriptor.digest.substring(7, 19) : // Remove 'sha256:' prefix
+                    image.reference
+                  }
                 </div>
               </TableCell>
-              <TableCell>{image.size}</TableCell>
+              <TableCell>
+                {image.descriptor?.size ? 
+                  `${Math.round(image.descriptor.size / 1024)} KB` : 
+                  '-'
+                }
+              </TableCell>
               <TableCell className="text-muted-foreground">
-                {formatDate(image.created)}
+                {image.reference?.includes('docker.io') ? 'Remote' : 'Local'}
               </TableCell>
               <TableCell>
                 <Badge 
-                  variant={image.registry === 'local' ? 'secondary' : 'outline'}
+                  variant={image.reference?.includes('docker.io') ? 'outline' : 'secondary'}
                   className="text-xs"
                 >
-                  {image.registry}
+                  {image.descriptor?.mediaType?.split('.').pop() || 'OCI'}
                 </Badge>
               </TableCell>
             </TableRow>

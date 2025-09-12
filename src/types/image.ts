@@ -1,15 +1,19 @@
-export interface DockerImage {
+export interface Image {
+  reference: string;
+  descriptor: {
+    digest: string;
+    size: number;
+    mediaType: string;
+  };
+  // Derived fields for UI convenience
+  repository?: string;
+  tag?: string;
+}
+
+// Keep legacy interface for compatibility during transition
+export interface DockerImage extends Image {
   id: string;
   name: string;
-  tag: string;
-  digest: string;
-  size: string;
-  created: string;
-  registry: 'local' | 'remote';
-  architecture?: string;
-  os?: string;
-  layers?: ImageLayer[];
-  history?: ImageHistoryEntry[];
 }
 
 export interface ImageLayer {

@@ -1,4 +1,4 @@
-import { DockerImage } from '@/types/image';
+import { Image, DockerImage } from '@/types/image';
 
 // Global API interface (already defined in containerApi.ts)
 declare global {
@@ -38,7 +38,27 @@ export class ImageApi {
     }
 
     try {
-      const images = JSON.parse(result.stdout) as DockerImage[];
+      const rawImages = JSON.parse(result.stdout);
+      
+      // Transform the raw image data to DockerImage interface for compatibility
+      const images: DockerImage[] = rawImages.map((raw: any) => {
+        // Parse reference to extract repository and tag
+        const reference = raw.reference || '';
+        const refParts = reference.split(':');
+        const tag = refParts.length > 1 ? refParts[refParts.length - 1] : 'latest';
+        const repository = refParts.slice(0, -1).join(':') || reference;
+        
+        return {
+          reference: raw.reference,
+          descriptor: raw.descriptor,
+          repository,
+          tag,
+          // Legacy fields for compatibility
+          id: raw.descriptor?.digest || raw.reference,
+          name: repository.split('/').pop() || repository,
+        };
+      });
+      
       return images;
     } catch (error) {
       throw new ImageApiError('Failed to parse image list response');

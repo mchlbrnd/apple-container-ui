@@ -42,10 +42,10 @@ export function ImageDetail({ image }: ImageDetailProps) {
             </p>
           </div>
           <Badge 
-            variant={image.registry === 'local' ? 'secondary' : 'outline'}
+            variant={image.reference?.includes('docker.io') ? 'outline' : 'secondary'}
             className="ml-2"
           >
-            {image.registry}
+            {image.reference?.includes('docker.io') ? 'Remote' : 'Local'}
           </Badge>
         </div>
       </div>
@@ -69,19 +69,20 @@ export function ImageDetail({ image }: ImageDetailProps) {
                   <CardContent className="pt-0 space-y-2">
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Size:</span>
-                      <span>{image.size}</span>
+                      <span>
+                        {image.descriptor?.size ? 
+                          `${Math.round(image.descriptor.size / 1024)} KB` : 
+                          'N/A'
+                        }
+                      </span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Created:</span>
-                      <span>{formatDate(image.created)}</span>
+                      <span className="text-muted-foreground">Media Type:</span>
+                      <span>{image.descriptor?.mediaType || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Architecture:</span>
-                      <span>{image.architecture || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">OS:</span>
-                      <span>{image.os || 'N/A'}</span>
+                      <span className="text-muted-foreground">Reference:</span>
+                      <span className="font-mono text-xs break-all">{image.reference}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -92,7 +93,7 @@ export function ImageDetail({ image }: ImageDetailProps) {
                   </CardHeader>
                   <CardContent className="pt-0">
                     <code className="text-xs font-mono break-all text-muted-foreground">
-                      {image.digest}
+                      {image.descriptor?.digest || 'N/A'}
                     </code>
                   </CardContent>
                 </Card>
@@ -102,62 +103,19 @@ export function ImageDetail({ image }: ImageDetailProps) {
           
           <TabsContent value="layers" className="flex-1 m-0 p-4">
             <ScrollArea className="h-full">
-              {image.layers ? (
-                <div className="space-y-2">
-                  {image.layers.map((layer, index) => (
-                    <Card key={layer.id}>
-                      <CardContent className="p-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-xs font-mono text-muted-foreground">
-                            {layer.id.substring(0, 12)}...
-                          </span>
-                          <Badge variant="outline" className="text-xs">
-                            {layer.size}
-                          </Badge>
-                        </div>
-                        <p className="text-xs font-mono break-all">
-                          {layer.command}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">No layer information available</p>
-              )}
+              <p className="text-muted-foreground text-sm">
+                Layer information is not available from the image list API. 
+                Use the inspect command to view detailed layer information.
+              </p>
             </ScrollArea>
           </TabsContent>
           
           <TabsContent value="history" className="flex-1 m-0 p-4">
             <ScrollArea className="h-full">
-              {image.history ? (
-                <div className="space-y-2">
-                  {image.history.map((entry, index) => (
-                    <Card key={index}>
-                      <CardContent className="p-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(entry.created)}
-                          </span>
-                          <Badge variant="outline" className="text-xs">
-                            {entry.size}
-                          </Badge>
-                        </div>
-                        <p className="text-xs font-mono break-all">
-                          {entry.createdBy}
-                        </p>
-                        {entry.comment && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {entry.comment}
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">No history information available</p>
-              )}
+              <p className="text-muted-foreground text-sm">
+                History information is not available from the image list API.
+                Use the inspect command to view detailed history information.
+              </p>
             </ScrollArea>
           </TabsContent>
         </Tabs>
