@@ -13,7 +13,7 @@ export default function ContainersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   
-  const { containers, loading, error, refresh, startContainer, stopContainer, deleteContainer, runContainer } = useContainers();
+  const { containers, loading, error, refresh, startContainer, stopContainer, deleteContainer, restartContainer, pauseContainer, killContainer, runContainer } = useContainers();
 
   const filteredContainers = useMemo(() => {
     return containers.filter((container) => {
@@ -126,7 +126,14 @@ export default function ContainersPage() {
         {/* Right Panel */}
         <div className="w-80 bg-card">
           {selectedContainer ? (
-            <ContainerDetail container={selectedContainer} />
+            <ContainerDetail 
+              container={selectedContainer}
+              onStart={startContainer}
+              onStop={stopContainer}
+              onRestart={restartContainer}
+              onPause={pauseContainer}
+              onDelete={deleteContainer}
+            />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground">
               <div className="text-center">

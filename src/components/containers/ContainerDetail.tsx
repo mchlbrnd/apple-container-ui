@@ -8,10 +8,16 @@ import { Container } from "@/types/container";
 import { Play, Square, Pause, RotateCcw, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ContainerApi, ContainerApiError } from "@/services/containerApi";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 interface ContainerDetailProps {
   container: Container;
+  onStart?: (containerId: string) => void;
+  onStop?: (containerId: string) => void;
+  onRestart?: (containerId: string) => void;
+  onPause?: (containerId: string) => void;
+  onDelete?: (containerId: string) => void;
 }
 
 const statusColors = {
@@ -60,7 +66,14 @@ const mockLogs = `2024-01-15T10:30:15Z [INFO] Starting application server
 2024-01-15T10:33:12Z [INFO] User authentication successful
 2024-01-15T10:33:12Z [INFO] Response sent: 200 OK`;
 
-export function ContainerDetail({ container }: ContainerDetailProps) {
+export function ContainerDetail({ 
+  container, 
+  onStart, 
+  onStop, 
+  onRestart, 
+  onPause, 
+  onDelete 
+}: ContainerDetailProps) {
   const [inspectData, setInspectData] = useState<any>(null);
   const [logs, setLogs] = useState<string>("");
   const [loadingInspect, setLoadingInspect] = useState(false);
@@ -145,6 +158,42 @@ export function ContainerDetail({ container }: ContainerDetailProps) {
     }
   };
 
+  const [execInput, setExecInput] = useState<string>("");
+  const [execOutput, setExecOutput] = useState<string>("");
+  const [execRunning, setExecRunning] = useState(false);
+
+  const startExec = async () => {
+    if (!execInput.trim()) return;
+    
+    try {
+      setExecRunning(true);
+      setExecOutput(prev => prev + `$ ${execInput}\n`);
+      
+      const runId = await ContainerApi.execInContainer(container.id, execInput);
+      
+      // Set up exec output handlers
+      const unsubscribeStdout = window.api?.onSpawnStdout?.((data) => {
+        setExecOutput(prev => prev + data);
+      });
+      
+      const unsubscribeStderr = window.api?.onSpawnStderr?.((data) => {
+        setExecOutput(prev => prev + data);
+      });
+      
+      const unsubscribeClose = window.api?.onSpawnClose?.(() => {
+        setExecRunning(false);
+        unsubscribeStdout?.();
+        unsubscribeStderr?.();
+        unsubscribeClose?.();
+      });
+      
+    } catch (err) {
+      const message = err instanceof ContainerApiError ? err.message : 'Failed to execute command';
+      setExecOutput(prev => prev + `Error: ${message}\n`);
+      setExecRunning(false);
+    }
+  };
+
   const clearLogs = () => {
     setLogs("");
   };
@@ -167,28 +216,53 @@ export function ContainerDetail({ container }: ContainerDetailProps) {
         {/* Quick Actions */}
         <div className="flex gap-2 mt-3">
           {container.status === 'stopped' && (
-            <Button size="sm" variant="outline" className="gap-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="gap-2"
+              onClick={() => onStart?.(container.id)}
+            >
               <Play className="h-3 w-3" />
               Start
             </Button>
           )}
           {container.status === 'running' && (
             <>
-              <Button size="sm" variant="outline" className="gap-2">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="gap-2"
+                onClick={() => onStop?.(container.id)}
+              >
                 <Square className="h-3 w-3" />
                 Stop
               </Button>
-              <Button size="sm" variant="outline" className="gap-2">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="gap-2"
+                onClick={() => onPause?.(container.id)}
+              >
                 <Pause className="h-3 w-3" />
                 Pause
               </Button>
             </>
           )}
-          <Button size="sm" variant="outline" className="gap-2">
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="gap-2"
+            onClick={() => onRestart?.(container.id)}
+          >
             <RotateCcw className="h-3 w-3" />
             Restart
           </Button>
-          <Button size="sm" variant="outline" className="gap-2 hover:bg-destructive hover:text-destructive-foreground">
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="gap-2 hover:bg-destructive hover:text-destructive-foreground"
+            onClick={() => onDelete?.(container.id)}
+          >
             <Trash2 className="h-3 w-3" />
             Remove
           </Button>
@@ -324,9 +398,38 @@ export function ContainerDetail({ container }: ContainerDetailProps) {
                 <p className="text-sm text-muted-foreground">
                   Execute commands in the container
                 </p>
-                <div className="border rounded-md p-4 bg-muted min-h-48 font-mono text-sm">
-                  <div className="text-muted-foreground">$ </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter command (e.g., /bin/bash, ls -la)"
+                    value={execInput}
+                    onChange={(e) => setExecInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !execRunning) {
+                        startExec();
+                      }
+                    }}
+                    disabled={execRunning}
+                  />
+                  <Button 
+                    onClick={startExec} 
+                    disabled={execRunning || !execInput.trim()}
+                    size="sm"
+                  >
+                    Execute
+                  </Button>
+                  <Button 
+                    onClick={() => setExecOutput("")} 
+                    variant="outline"
+                    size="sm"
+                  >
+                    Clear
+                  </Button>
                 </div>
+                <ScrollArea className="h-80 w-full rounded-md border p-4 bg-muted">
+                  <pre className="text-xs font-mono whitespace-pre-wrap">
+                    {execOutput || "Enter a command above to execute in the container"}
+                  </pre>
+                </ScrollArea>
               </div>
             </TabsContent>
           </div>

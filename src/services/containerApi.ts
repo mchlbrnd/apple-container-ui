@@ -152,6 +152,24 @@ export class ContainerApi {
     }
   }
 
+  static async restartContainer(containerId: string): Promise<void> {
+    const api = this.checkApi();
+    const result = await api.exec('container', ['restart', containerId]);
+    
+    if (result.code !== 0) {
+      throw new ContainerApiError(`Failed to restart container ${containerId}`, result.code, result.stderr);
+    }
+  }
+
+  static async pauseContainer(containerId: string): Promise<void> {
+    const api = this.checkApi();
+    const result = await api.exec('container', ['pause', containerId]);
+    
+    if (result.code !== 0) {
+      throw new ContainerApiError(`Failed to pause container ${containerId}`, result.code, result.stderr);
+    }
+  }
+
   static async killContainer(containerId: string): Promise<void> {
     const api = this.checkApi();
     const result = await api.exec('container', ['kill', containerId]);

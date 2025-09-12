@@ -92,6 +92,60 @@ export function useContainers() {
     }
   }, [fetchContainers, toast]);
 
+  const restartContainer = useCallback(async (containerId: string) => {
+    try {
+      await ContainerApi.restartContainer(containerId);
+      toast({
+        title: "Container Restarted",
+        description: `Container ${containerId.substring(0, 12)} restarted successfully`,
+      });
+      await fetchContainers();
+    } catch (err) {
+      const message = err instanceof ContainerApiError ? err.message : 'Failed to restart container';
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  }, [fetchContainers, toast]);
+
+  const pauseContainer = useCallback(async (containerId: string) => {
+    try {
+      await ContainerApi.pauseContainer(containerId);
+      toast({
+        title: "Container Paused",
+        description: `Container ${containerId.substring(0, 12)} paused successfully`,
+      });
+      await fetchContainers();
+    } catch (err) {
+      const message = err instanceof ContainerApiError ? err.message : 'Failed to pause container';
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  }, [fetchContainers, toast]);
+
+  const killContainer = useCallback(async (containerId: string) => {
+    try {
+      await ContainerApi.killContainer(containerId);
+      toast({
+        title: "Container Killed",
+        description: `Container ${containerId.substring(0, 12)} killed successfully`,
+      });
+      await fetchContainers();
+    } catch (err) {
+      const message = err instanceof ContainerApiError ? err.message : 'Failed to kill container';
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  }, [fetchContainers, toast]);
+
   const runContainer = useCallback(async (options: {
     name?: string;
     image: string;
@@ -130,6 +184,9 @@ export function useContainers() {
     startContainer,
     stopContainer,
     deleteContainer,
+    restartContainer,
+    pauseContainer,
+    killContainer,
     runContainer,
   };
 }
