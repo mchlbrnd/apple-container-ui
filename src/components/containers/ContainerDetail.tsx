@@ -1,0 +1,212 @@
+import { formatDistanceToNow } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Container } from "@/types/container";
+import { Play, Square, Pause, RotateCcw, Trash2 } from "lucide-react";
+
+interface ContainerDetailProps {
+  container: Container;
+}
+
+const statusColors = {
+  running: "bg-success text-success-foreground",
+  stopped: "bg-muted text-muted-foreground", 
+  paused: "bg-warning text-warning-foreground",
+  restarting: "bg-primary text-primary-foreground",
+  removing: "bg-destructive text-destructive-foreground",
+  created: "bg-accent text-accent-foreground",
+};
+
+// Mock data for detailed view
+const mockInspectData = {
+  Config: {
+    Hostname: "webapp-01",
+    ExposedPorts: { "80/tcp": {}, "443/tcp": {} },
+    Env: [
+      "NODE_ENV=production",
+      "PORT=3000",
+      "DATABASE_URL=postgresql://localhost:5432/app"
+    ],
+    Cmd: ["npm", "start"],
+    WorkingDir: "/app"
+  },
+  NetworkSettings: {
+    IPAddress: "172.17.0.2",
+    MacAddress: "02:42:ac:11:00:02",
+    Ports: {
+      "3000/tcp": [{ HostIp: "0.0.0.0", HostPort: "3000" }]
+    }
+  },
+  State: {
+    StartedAt: "2024-01-15T10:30:00Z",
+    FinishedAt: "0001-01-01T00:00:00Z",
+    ExitCode: 0
+  }
+};
+
+const mockLogs = `2024-01-15T10:30:15Z [INFO] Starting application server
+2024-01-15T10:30:16Z [INFO] Connected to database
+2024-01-15T10:30:16Z [INFO] Server listening on port 3000
+2024-01-15T10:32:45Z [INFO] Processing request GET /api/users
+2024-01-15T10:32:45Z [DEBUG] Query executed in 12ms
+2024-01-15T10:32:45Z [INFO] Response sent: 200 OK
+2024-01-15T10:33:12Z [INFO] Processing request POST /api/login
+2024-01-15T10:33:12Z [INFO] User authentication successful
+2024-01-15T10:33:12Z [INFO] Response sent: 200 OK`;
+
+export function ContainerDetail({ container }: ContainerDetailProps) {
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="border-b border-border p-4 bg-card">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">{container.name}</h2>
+            <p className="text-sm text-muted-foreground font-mono">
+              {container.id}
+            </p>
+          </div>
+          <Badge className={statusColors[container.status]}>
+            {container.status}
+          </Badge>
+        </div>
+        
+        {/* Quick Actions */}
+        <div className="flex gap-2 mt-3">
+          {container.status === 'stopped' && (
+            <Button size="sm" variant="outline" className="gap-2">
+              <Play className="h-3 w-3" />
+              Start
+            </Button>
+          )}
+          {container.status === 'running' && (
+            <>
+              <Button size="sm" variant="outline" className="gap-2">
+                <Square className="h-3 w-3" />
+                Stop
+              </Button>
+              <Button size="sm" variant="outline" className="gap-2">
+                <Pause className="h-3 w-3" />
+                Pause
+              </Button>
+            </>
+          )}
+          <Button size="sm" variant="outline" className="gap-2">
+            <RotateCcw className="h-3 w-3" />
+            Restart
+          </Button>
+          <Button size="sm" variant="outline" className="gap-2 hover:bg-destructive hover:text-destructive-foreground">
+            <Trash2 className="h-3 w-3" />
+            Remove
+          </Button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 p-4">
+        <Tabs defaultValue="summary" className="h-full flex flex-col">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="summary">Summary</TabsTrigger>
+            <TabsTrigger value="inspect">Inspect</TabsTrigger>
+            <TabsTrigger value="logs">Logs</TabsTrigger>
+            <TabsTrigger value="exec">Exec</TabsTrigger>
+          </TabsList>
+          
+          <div className="flex-1 mt-4">
+            <TabsContent value="summary" className="h-full">
+              <div className="grid gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Container Info</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <div className="text-muted-foreground">Image</div>
+                        <div className="font-medium">{container.image}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Status</div>
+                        <div className="font-medium">{container.status}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Created</div>
+                        <div className="font-medium">
+                          {formatDistanceToNow(new Date(container.created), { addSuffix: true })}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Ports</div>
+                        <div className="font-medium">
+                          {container.ports.length > 0 ? container.ports.join(", ") : "None"}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {container.status === 'running' && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Resource Usage</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <div className="text-muted-foreground">CPU</div>
+                          <div className="font-medium">{container.cpu?.toFixed(1)}%</div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground">Memory</div>
+                          <div className="font-medium">
+                            {container.memory ? (container.memory / 1024 / 1024).toFixed(0) : 0} MB
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="inspect" className="h-full">
+              <ScrollArea className="h-96 w-full rounded-md border p-4">
+                <pre className="text-xs font-mono">
+                  {JSON.stringify(mockInspectData, null, 2)}
+                </pre>
+              </ScrollArea>
+            </TabsContent>
+            
+            <TabsContent value="logs" className="h-full">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline">Follow</Button>
+                  <Button size="sm" variant="outline">Clear</Button>
+                </div>
+                <ScrollArea className="h-80 w-full rounded-md border p-4 bg-muted">
+                  <pre className="text-xs font-mono whitespace-pre-wrap">
+                    {mockLogs}
+                  </pre>
+                </ScrollArea>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="exec" className="h-full">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Execute commands in the container
+                </p>
+                <div className="border rounded-md p-4 bg-muted min-h-48 font-mono text-sm">
+                  <div className="text-muted-foreground">$ </div>
+                </div>
+              </div>
+            </TabsContent>
+          </div>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
