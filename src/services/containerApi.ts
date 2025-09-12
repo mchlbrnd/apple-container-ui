@@ -42,7 +42,23 @@ export class ContainerApi {
     }
 
     try {
-      const containers = JSON.parse(result.stdout) as Container[];
+      const rawContainers = JSON.parse(result.stdout);
+      
+      // Transform the raw container data to our Container interface
+      const containers: Container[] = rawContainers.map((raw: any) => ({
+        id: raw.configuration?.id || raw.id,
+        name: raw.configuration?.labels?.name || raw.name || raw.configuration?.id?.substring(0, 12),
+        image: raw.configuration?.image?.reference || raw.image,
+        status: raw.status || 'unknown',
+        created: raw.created,
+        ports: raw.configuration?.publishedPorts?.map((port: any) => 
+          `${port.hostPort}:${port.containerPort}/${port.protocol}`
+        ) || [],
+        networks: raw.networks || [],
+        labels: raw.configuration?.labels || {},
+        configuration: raw.configuration
+      }));
+      
       return containers;
     } catch (error) {
       throw new ContainerApiError('Failed to parse container list response');

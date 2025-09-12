@@ -2,14 +2,57 @@ export interface Container {
   id: string;
   name: string;
   image: string;
-  status: 'running' | 'stopped' | 'paused' | 'restarting' | 'removing' | 'created';
+  status: 'running' | 'stopped' | 'paused' | 'restarting' | 'removing' | 'created' | 'exited';
   ports: string[];
-  created: string;
+  created?: string;
   cpu?: number;
   memory?: number;
   command?: string;
   state?: string;
   uptime?: string;
+  networks?: ContainerNetwork[];
+  labels?: Record<string, string>;
+  configuration?: ContainerConfiguration;
+}
+
+export interface ContainerNetwork {
+  network: string;
+  address?: string;
+  gateway?: string;
+  hostname?: string;
+}
+
+export interface ContainerConfiguration {
+  id: string;
+  image: {
+    reference: string;
+    descriptor: {
+      mediaType: string;
+      digest: string;
+      size: number;
+    };
+  };
+  publishedPorts: PublishedPort[];
+  networks: NetworkConfig[];
+  labels: Record<string, string>;
+  resources: {
+    memoryInBytes: number;
+    cpus: number;
+  };
+  mounts: any[];
+}
+
+export interface PublishedPort {
+  hostPort: number;
+  containerPort: number;
+  protocol: string;
+}
+
+export interface NetworkConfig {
+  network: string;
+  options: {
+    hostname: string;
+  };
 }
 
 export interface ContainerStats {

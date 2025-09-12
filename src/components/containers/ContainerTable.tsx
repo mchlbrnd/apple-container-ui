@@ -24,6 +24,7 @@ interface ContainerTableProps {
 const statusColors = {
   running: "bg-success text-success-foreground",
   stopped: "bg-muted text-muted-foreground", 
+  exited: "bg-muted text-muted-foreground",
   paused: "bg-warning text-warning-foreground",
   restarting: "bg-primary text-primary-foreground",
   removing: "bg-destructive text-destructive-foreground",
@@ -118,7 +119,10 @@ export function ContainerTable({
               </TableCell>
               <TableCell>
                 <div className="text-sm text-muted-foreground">
-                  {formatDistanceToNow(new Date(container.created), { addSuffix: true })}
+                  {container.created ? 
+                    formatDistanceToNow(new Date(container.created), { addSuffix: true }) : 
+                    "-"
+                  }
                 </div>
               </TableCell>
               <TableCell className="text-right">
