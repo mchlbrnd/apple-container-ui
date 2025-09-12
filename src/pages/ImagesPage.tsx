@@ -1,21 +1,23 @@
 import { useState, useMemo } from "react";
 import { DockerImage } from "@/types/image";
-import { mockImages } from "@/data/mockImages";
 import { ImageToolbar } from "@/components/images/ImageToolbar";
 import { ImageTable } from "@/components/images/ImageTable";
 import { ImageDetail } from "@/components/images/ImageDetail";
 import { PullImageDialog } from "@/components/images/PullImageDialog";
 import { BuildImageDialog } from "@/components/images/BuildImageDialog";
-import { useToast } from "@/hooks/use-toast";
+import { TagImageDialog } from "@/components/images/TagImageDialog";
+import { useImages } from "@/hooks/useImages";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export default function ImagesPage() {
-  const [images] = useState<DockerImage[]>(mockImages);
+  const { images, loading, pullImage, buildImage, tagImage, pushImage, deleteImage, pruneImages } = useImages();
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [selectedImage, setSelectedImage] = useState<DockerImage | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [pullDialogOpen, setPullDialogOpen] = useState(false);
   const [buildDialogOpen, setBuildDialogOpen] = useState(false);
-  const { toast } = useToast();
+  const [tagDialogOpen, setTagDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const filteredImages = useMemo(() => {
     if (!searchQuery) return images;
@@ -43,49 +45,84 @@ export default function ImagesPage() {
     setSelectedImage(image);
   };
 
-  const handlePull = (registry: string, username?: string, password?: string) => {
-    toast({
-      title: "Pulling image",
-      description: `Starting pull for ${registry}`,
-    });
-    console.log("Pull image:", { registry, username, password });
+  const handlePull = async (registry: string, username?: string, password?: string) => {
+    try {
+      await pullImage(registry, username, password);
+      setPullDialogOpen(false);
+    } catch (error) {
+      // Error is handled in the hook
+    }
   };
 
-  const handleBuild = (contextPath: string, dockerfilePath: string, tag: string) => {
-    toast({
-      title: "Building image",
-      description: `Building ${tag} from ${contextPath}`,
-    });
-    console.log("Build image:", { contextPath, dockerfilePath, tag });
+  const handleBuild = async (contextPath: string, dockerfilePath: string, tag: string) => {
+    try {
+      await buildImage(contextPath, dockerfilePath, tag);
+      setBuildDialogOpen(false);
+    } catch (error) {
+      // Error is handled in the hook
+    }
   };
 
   const handleTag = () => {
-    toast({
-      title: "Tag image",
-      description: `Tagging ${selectedImages.length} image(s)`,
-    });
+    if (selectedImages.length === 1) {
+      setTagDialogOpen(true);
+    }
   };
 
-  const handlePush = () => {
-    toast({
-      title: "Push images",
-      description: `Pushing ${selectedImages.length} image(s)`,
-    });
+  const handleTagSubmit = async (newTag: string) => {
+    if (selectedImages.length === 1) {
+      const selectedImage = images.find(img => img.id === selectedImages[0]);
+      if (selectedImage) {
+        try {
+          await tagImage(`${selectedImage.name}:${selectedImage.tag}`, newTag);
+          setTagDialogOpen(false);
+        } catch (error) {
+          // Error is handled in the hook
+        }
+      }
+    }
+  };
+
+  const handlePush = async () => {
+    try {
+      for (const imageId of selectedImages) {
+        const image = images.find(img => img.id === imageId);
+        if (image) {
+          await pushImage(`${image.name}:${image.tag}`);
+        }
+      }
+    } catch (error) {
+      // Error is handled in the hook
+    }
   };
 
   const handleDelete = () => {
-    toast({
-      title: "Delete images",
-      description: `Deleting ${selectedImages.length} image(s)`,
-      variant: "destructive"
-    });
+    if (selectedImages.length > 0) {
+      setDeleteDialogOpen(true);
+    }
   };
 
-  const handlePrune = () => {
-    toast({
-      title: "Prune images",
-      description: "Removing unused images",
-    });
+  const handleDeleteConfirm = async () => {
+    try {
+      for (const imageId of selectedImages) {
+        const image = images.find(img => img.id === imageId);
+        if (image) {
+          await deleteImage(`${image.name}:${image.tag}`);
+        }
+      }
+      setSelectedImages([]);
+      setDeleteDialogOpen(false);
+    } catch (error) {
+      // Error is handled in the hook
+    }
+  };
+
+  const handlePrune = async () => {
+    try {
+      await pruneImages();
+    } catch (error) {
+      // Error is handled in the hook
+    }
   };
 
   return (
@@ -128,6 +165,35 @@ export default function ImagesPage() {
         onOpenChange={setBuildDialogOpen}
         onBuild={handleBuild}
       />
+
+      <TagImageDialog
+        open={tagDialogOpen}
+        onOpenChange={setTagDialogOpen}
+        onTag={handleTagSubmit}
+        currentTag={selectedImages.length === 1 ? 
+          (() => {
+            const image = images.find(img => img.id === selectedImages[0]);
+            return image ? `${image.name}:${image.tag}` : '';
+          })() : ''
+        }
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Images</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedImages.length} image(s)? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
