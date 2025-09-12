@@ -223,9 +223,9 @@ export function ContainerDetail({ container }: ContainerDetailProps) {
                         <div className="font-medium">{container.status}</div>
                       </div>
                       <div>
-                        <div className="text-muted-foreground">Created</div>
+                        <div className="text-muted-foreground">Network</div>
                         <div className="font-medium">
-                          {formatDistanceToNow(new Date(container.created), { addSuffix: true })}
+                          {container.networks?.[0]?.network || "default"}
                         </div>
                       </div>
                       <div>
@@ -238,21 +238,21 @@ export function ContainerDetail({ container }: ContainerDetailProps) {
                   </CardContent>
                 </Card>
                 
-                {container.status === 'running' && (
+                {container.configuration?.resources && (
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-sm">Resource Usage</CardTitle>
+                      <CardTitle className="text-sm">Resource Limits</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <div className="text-muted-foreground">CPU</div>
-                          <div className="font-medium">{container.cpu?.toFixed(1)}%</div>
+                          <div className="font-medium">{container.configuration.resources.cpus} cores</div>
                         </div>
                         <div>
                           <div className="text-muted-foreground">Memory</div>
                           <div className="font-medium">
-                            {container.memory ? (container.memory / 1024 / 1024).toFixed(0) : 0} MB
+                            {Math.round(container.configuration.resources.memoryInBytes / 1024 / 1024)} MB
                           </div>
                         </div>
                       </div>

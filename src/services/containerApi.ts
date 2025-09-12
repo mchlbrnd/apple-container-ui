@@ -47,10 +47,9 @@ export class ContainerApi {
       // Transform the raw container data to our Container interface
       const containers: Container[] = rawContainers.map((raw: any) => ({
         id: raw.configuration?.id || raw.id,
-        name: raw.configuration?.labels?.name || raw.name || raw.configuration?.id?.substring(0, 12),
+        name: raw.configuration?.networks?.[0]?.options?.hostname || raw.configuration?.id?.substring(0, 12) || 'unknown',
         image: raw.configuration?.image?.reference || raw.image,
         status: raw.status || 'unknown',
-        created: raw.created,
         ports: raw.configuration?.publishedPorts?.map((port: any) => 
           `${port.hostPort}:${port.containerPort}/${port.protocol}`
         ) || [],

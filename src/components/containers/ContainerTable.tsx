@@ -68,8 +68,8 @@ export function ContainerTable({
             <TableHead>Image</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Ports</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead className="text-right">CPU / Memory</TableHead>
+            <TableHead>Network</TableHead>
+            <TableHead className="text-right">Resources</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -119,19 +119,16 @@ export function ContainerTable({
               </TableCell>
               <TableCell>
                 <div className="text-sm text-muted-foreground">
-                  {container.created ? 
-                    formatDistanceToNow(new Date(container.created), { addSuffix: true }) : 
-                    "-"
-                  }
+                  {container.networks?.[0]?.network || "-"}
                 </div>
               </TableCell>
               <TableCell className="text-right">
                 <div className="text-sm">
-                  {container.cpu !== undefined && container.memory !== undefined ? (
+                  {container.configuration?.resources ? (
                     <div className="space-y-1">
-                      <div>{container.cpu.toFixed(1)}%</div>
+                      <div>{container.configuration.resources.cpus} CPU</div>
                       <div className="text-muted-foreground">
-                        {(container.memory / 1024 / 1024).toFixed(0)} MB
+                        {Math.round(container.configuration.resources.memoryInBytes / 1024 / 1024)} MB
                       </div>
                     </div>
                   ) : (

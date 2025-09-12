@@ -4,12 +4,6 @@ export interface Container {
   image: string;
   status: 'running' | 'stopped' | 'paused' | 'restarting' | 'removing' | 'created' | 'exited';
   ports: string[];
-  created?: string;
-  cpu?: number;
-  memory?: number;
-  command?: string;
-  state?: string;
-  uptime?: string;
   networks?: ContainerNetwork[];
   labels?: Record<string, string>;
   configuration?: ContainerConfiguration;
