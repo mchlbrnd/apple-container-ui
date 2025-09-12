@@ -24,6 +24,23 @@ export function useContainers() {
       // Apply stopping/starting status for containers that are in transition
       const updatedContainers = containerList.map(container => {
         console.log(`Processing container ${container.id}, status: ${container.status}`);
+
+        // Prefer 'starting' if both flags exist
+        if (startingContainers.has(container.id)) {
+          console.log(`Container ${container.id} is in starting set, current status: ${container.status}`);
+          if (container.status === 'running') {
+            console.log(`Container ${container.id} is now running, removing from starting set`);
+            setStartingContainers(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(container.id);
+              return newSet;
+            });
+            return container;
+          } else {
+            console.log(`Container ${container.id} still not running, keeping as starting`);
+            return { ...container, status: 'starting' as Container['status'] };
+          }
+        }
         
         if (stoppingContainers.has(container.id)) {
           console.log(`Container ${container.id} is in stopping set`);
@@ -38,24 +55,6 @@ export function useContainers() {
               return newSet;
             });
             return container;
-          }
-        }
-        
-        if (startingContainers.has(container.id)) {
-          console.log(`Container ${container.id} is in starting set, current status: ${container.status}`);
-          // If container is running, remove from starting set
-          if (container.status === 'running') {
-            console.log(`Container ${container.id} is now running, removing from starting set`);
-            setStartingContainers(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(container.id);
-              return newSet;
-            });
-            return container;
-          } else {
-            // Container still not running, keep it as starting
-            console.log(`Container ${container.id} still not running, keeping as starting`);
-            return { ...container, status: 'starting' as Container['status'] };
           }
         }
         
@@ -94,7 +93,14 @@ export function useContainers() {
       
       // Immediately set container to starting status
       setStartingContainers(prev => {
-        const newSet = new Set(prev).add(containerId);
+        // Clear from stopping set if present to avoid conflicts with 'stopping' overlay
+        setStoppingContainers(prevStop => {
+          const s = new Set(prevStop);
+          s.delete(containerId);
+          return s;
+        });
+        const newSet = new Set(prev);
+        newSet.add(containerId);
         console.log('Starting containers set:', newSet);
         return newSet;
       });
