@@ -3,6 +3,18 @@ import { Container } from '@/types/container';
 import { ContainerApi, ContainerApiError } from '@/services/containerApi';
 import { useToast } from '@/hooks/use-toast';
 
+// Shallow comparison helper for containers
+const containersEqual = (a: Container[], b: Container[]) => {
+  if (a.length !== b.length) return false;
+  return a.every((container, index) => {
+    const other = b[index];
+    return container.id === other.id && 
+           container.status === other.status &&
+           container.name === other.name &&
+           container.image === other.image;
+  });
+};
+
 export function useContainers() {
   const [containers, setContainers] = useState<Container[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,9 +26,12 @@ export function useContainers() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
-  const fetchContainers = useCallback(async () => {
+  const fetchContainers = useCallback(async (isInitialFetch = false) => {
     try {
-      setLoading(true);
+      // Only show loading state on initial fetch, not during polling
+      if (isInitialFetch) {
+        setLoading(true);
+      }
       setError(null);
       const containerList = await ContainerApi.listContainers();
       
@@ -54,7 +69,13 @@ export function useContainers() {
         return container;
       });
       
-      setContainers(updatedContainers);
+      // Only update state if containers have actually changed
+      setContainers(prev => {
+        if (containersEqual(prev, updatedContainers)) {
+          return prev; // No change, return same reference to prevent re-render
+        }
+        return updatedContainers;
+      });
     } catch (err) {
       const message = err instanceof ContainerApiError ? err.message : 'Failed to fetch containers';
       setError(message);
@@ -74,17 +95,19 @@ export function useContainers() {
         });
       }
     } finally {
-      setLoading(false);
+      if (isInitialFetch) {
+        setLoading(false);
+      }
     }
   }, [toast, stoppingContainers, startingContainers]);
 
   // Polling mechanism
   useEffect(() => {
     if (isPolling) {
-      fetchContainers(); // Initial fetch
+      fetchContainers(true); // Initial fetch with loading state
       
       intervalRef.current = setInterval(() => {
-        fetchContainers();
+        fetchContainers(false); // Polling fetches without loading state
       }, pollingInterval);
     }
     
@@ -276,11 +299,13 @@ export function useContainers() {
     }
   }, [toast]);
 
+  const refresh = useCallback(() => fetchContainers(true), [fetchContainers]);
+
   return {
     containers,
     loading,
     error,
-    refresh: fetchContainers,
+    refresh,
     startContainer,
     stopContainer,
     deleteContainer,
