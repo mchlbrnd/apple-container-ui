@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Container } from '@/types/container';
 import { ContainerApi, ContainerApiError } from '@/services/containerApi';
 import { useToast } from '@/hooks/use-toast';
@@ -9,27 +9,22 @@ export function useContainers() {
   const [error, setError] = useState<string | null>(null);
   const [stoppingContainers, setStoppingContainers] = useState<Set<string>>(new Set());
   const [startingContainers, setStartingContainers] = useState<Set<string>>(new Set());
+  const [isPolling, setIsPolling] = useState(true);
+  const [pollingInterval, setPollingInterval] = useState(2000); // 2 seconds default
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   const fetchContainers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching containers...');
       const containerList = await ContainerApi.listContainers();
-      console.log('Raw container list:', containerList);
-      console.log('Current startingContainers:', startingContainers);
-      console.log('Current stoppingContainers:', stoppingContainers);
       
       // Apply stopping/starting status for containers that are in transition
       const updatedContainers = containerList.map(container => {
-        console.log(`Processing container ${container.id}, status: ${container.status}`);
-
         // Prefer 'starting' if both flags exist
         if (startingContainers.has(container.id)) {
-          console.log(`Container ${container.id} is in starting set, current status: ${container.status}`);
           if (container.status === 'running') {
-            console.log(`Container ${container.id} is now running, removing from starting set`);
             setStartingContainers(prev => {
               const newSet = new Set(prev);
               newSet.delete(container.id);
@@ -37,13 +32,11 @@ export function useContainers() {
             });
             return container;
           } else {
-            console.log(`Container ${container.id} still not running, keeping as starting`);
             return { ...container, status: 'starting' as Container['status'] };
           }
         }
         
         if (stoppingContainers.has(container.id)) {
-          console.log(`Container ${container.id} is in stopping set`);
           // If container is still running, keep it as stopping
           if (container.status === 'running') {
             return { ...container, status: 'stopping' as Container['status'] };
@@ -61,10 +54,8 @@ export function useContainers() {
         return container;
       });
       
-      console.log('Updated containers:', updatedContainers);
       setContainers(updatedContainers);
     } catch (err) {
-      console.log('Error fetching containers:', err);
       const message = err instanceof ContainerApiError ? err.message : 'Failed to fetch containers';
       setError(message);
       
@@ -87,10 +78,30 @@ export function useContainers() {
     }
   }, [toast, stoppingContainers, startingContainers]);
 
+  // Polling mechanism
+  useEffect(() => {
+    if (isPolling) {
+      fetchContainers(); // Initial fetch
+      
+      intervalRef.current = setInterval(() => {
+        fetchContainers();
+      }, pollingInterval);
+    }
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [fetchContainers, isPolling, pollingInterval]);
+
+  const startPolling = useCallback(() => setIsPolling(true), []);
+  const stopPolling = useCallback(() => setIsPolling(false), []);
+  const setPollingRate = useCallback((interval: number) => setPollingInterval(interval), []);
+
   const startContainer = useCallback(async (containerId: string) => {
     try {
-      console.log('Starting container:', containerId);
-      
       // Immediately set container to starting status
       setStartingContainers(prev => {
         // Clear from stopping set if present to avoid conflicts with 'stopping' overlay
@@ -101,7 +112,6 @@ export function useContainers() {
         });
         const newSet = new Set(prev);
         newSet.add(containerId);
-        console.log('Starting containers set:', newSet);
         return newSet;
       });
       
@@ -111,19 +121,13 @@ export function useContainers() {
           : container
       ));
 
-      console.log('About to call ContainerApi.startContainer');
       await ContainerApi.startContainer(containerId);
-      console.log('ContainerApi.startContainer completed');
       
       toast({
         title: "Container Started",
         description: `Container ${containerId.substring(0, 12)} started successfully`,
       });
-      
-      console.log('About to fetch containers');
-      await fetchContainers();
     } catch (err) {
-      console.log('Error starting container:', err);
       // Remove from starting set if error occurs
       setStartingContainers(prev => {
         const newSet = new Set(prev);
@@ -137,9 +141,8 @@ export function useContainers() {
         description: message,
         variant: "destructive",
       });
-      await fetchContainers(); // Refresh to get actual status
     }
-  }, [fetchContainers, toast]);
+  }, [toast]);
 
   const stopContainer = useCallback(async (containerId: string) => {
     try {
@@ -156,7 +159,6 @@ export function useContainers() {
         title: "Container Stopped",
         description: `Container ${containerId.substring(0, 12)} stopped successfully`,
       });
-      await fetchContainers();
     } catch (err) {
       // Remove from stopping set if error occurs
       setStoppingContainers(prev => {
@@ -171,9 +173,8 @@ export function useContainers() {
         description: message,
         variant: "destructive",
       });
-      await fetchContainers(); // Refresh to get actual status
     }
-  }, [fetchContainers, toast]);
+  }, [toast]);
 
   const deleteContainer = useCallback(async (containerId: string) => {
     try {
@@ -182,7 +183,6 @@ export function useContainers() {
         title: "Container Deleted",
         description: `Container ${containerId.substring(0, 12)} deleted successfully`,
       });
-      await fetchContainers();
     } catch (err) {
       const message = err instanceof ContainerApiError ? err.message : 'Failed to delete container';
       toast({
@@ -191,7 +191,7 @@ export function useContainers() {
         variant: "destructive",
       });
     }
-  }, [fetchContainers, toast]);
+  }, [toast]);
 
   const restartContainer = useCallback(async (containerId: string) => {
     try {
@@ -216,7 +216,6 @@ export function useContainers() {
         title: "Container Restarted",
         description: `Container ${containerId.substring(0, 12)} restarted successfully`,
       });
-      await fetchContainers();
     } catch (err) {
       // Remove from stopping set if error occurs
       setStoppingContainers(prev => {
@@ -231,9 +230,8 @@ export function useContainers() {
         description: message,
         variant: "destructive",
       });
-      await fetchContainers(); // Refresh to get actual status
     }
-  }, [fetchContainers, toast]);
+  }, [toast]);
 
 
   const killContainer = useCallback(async (containerId: string) => {
@@ -243,7 +241,6 @@ export function useContainers() {
         title: "Container Killed",
         description: `Container ${containerId.substring(0, 12)} killed successfully`,
       });
-      await fetchContainers();
     } catch (err) {
       const message = err instanceof ContainerApiError ? err.message : 'Failed to kill container';
       toast({
@@ -252,7 +249,7 @@ export function useContainers() {
         variant: "destructive",
       });
     }
-  }, [fetchContainers, toast]);
+  }, [toast]);
 
   const runContainer = useCallback(async (options: {
     name?: string;
@@ -269,7 +266,6 @@ export function useContainers() {
         title: "Container Running",
         description: `Container from ${options.image} started successfully`,
       });
-      await fetchContainers();
     } catch (err) {
       const message = err instanceof ContainerApiError ? err.message : 'Failed to run container';
       toast({
@@ -278,11 +274,7 @@ export function useContainers() {
         variant: "destructive",
       });
     }
-  }, [fetchContainers, toast]);
-
-  useEffect(() => {
-    fetchContainers();
-  }, [fetchContainers]);
+  }, [toast]);
 
   return {
     containers,
@@ -295,5 +287,11 @@ export function useContainers() {
     restartContainer,
     killContainer,
     runContainer,
+    // Polling controls
+    isPolling,
+    pollingInterval,
+    startPolling,
+    stopPolling,
+    setPollingRate,
   };
 }
